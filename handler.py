@@ -1,1 +1,2 @@
-print("Output from handler")
+#stringIn = input("")
+print("say Hello fredo!")
