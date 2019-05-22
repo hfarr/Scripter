@@ -1,11 +1,23 @@
-print("Simulated output")
-ignoreResponse = input()
+f = open("output.txt", 'w')
 
-#print("This output should be run by exec, accessible by the parent")
+
+def outToFile(text, f):
+    f.write(text + "\n")
+
+print("Simulated output fredo")
+outToFile(input(), f)
+
+print("this is the end")
+outToFile(input(), f)
+
 print("[22:19:55] [Server thread/INFO]: fredo joined the game")
-handlerResponse = input()
+outToFile(input(), f)
 
-with open("output.txt", 'a') as f:
-    f.write("INFO: " + handlerResponse + '\n')
-    f.close()
+print("who")
+outToFile(input(), f)
+
+print("what")
+outToFile(input(), f)
+
+f.close()
 

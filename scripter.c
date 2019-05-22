@@ -61,11 +61,13 @@ int main(int argc, char **argv) {
             char *argHandler[] = {argv[2], argv[2], buffer, (char *) NULL}; 
             handle(buffer, result, argHandler, pid);
 
-            fprintf(stdout, "RESULT: %s\n", result);
+            // fprintf(stdout, "RESULT: %s\n", result);
             dprintf(fdpin[1], "%s\n", result);
 
         }
-        printf("Process terminated, good bye\n");
+        printf("\n----------------------------\
+                \nProcess terminated, good bye\
+                \n----------------------------\n");
 
         fclose(inputstream);
     }
@@ -99,9 +101,10 @@ void handle(char *input, char *result, char *args[], int pid) {
 // precondiction: *line is a pointer to some buffer with enough space for 
 // the next line
 //
-// read a line from STREAM
-// reads until the newline character or EOF,
-// does not include the newline character.
+// read a line from stream by:
+// * reading until newline character or EOF, placing characters into line
+// * not including the newline character
+//
 // returns the last character read, either newline or EOF
 int readline(FILE *stream, char *line) {
     
