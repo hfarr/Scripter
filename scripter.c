@@ -55,12 +55,13 @@ int main(int argc, char **argv) {
             printf("%d\n", val); */
 
 
+            char *argHandler[] = {argv[2], argv[2]}; 
+
             // but placed here they do not work
-            char *arr[] = {"/bin/echo", "from dawn till dust"};
+            char *arr[] = {"/bin/echo", "from dawn till dust", (char *) NULL};
             int val = execv(arr[0], arr);
             printf("%d\n", val);
 
-            char *argHandler[] = {argv[2], argv[2]}; // I am lazy TODO
 
             handle(buffer, result, argHandler, pid);
             printf("RESULT: %s\n", result);
@@ -77,41 +78,39 @@ int main(int argc, char **argv) {
 
 // Spawn the handling process
 void handle(char *input, char *result, char *args[], int pid) {
-    char *arr[] = {"/bin/echo", "from dawn till dust"};
-    execv(arr[0], arr);
-
-
 
     int fdhandler[2];
     pipe(fdhandler);
-
-    /*char *arr[] = {"/bin/echo", "dust"};
-    execv(arr[0], arr);*/
-
-
-        
+       
     if (fork() == 0) {
         printf("%s\n", input);
         dup2(fdhandler[1], STDOUT); // pipe stdout to the write-in of the pipe
         
-        close(fdhandler[0]);
+        close(fdhandler[0]); // we don't need to write to the pipe in the child
 
+        // Test that STDOUT is redirected to the pipe
         printf("This should go in the pipe\n");
         printf("This should go in the pipe too\n");
 
         execv(args[0], args);
         exit(0);
     }
+
     FILE *resultStream = fdopen(fdhandler[0], "r");
-    close(fdhandler[1]);
+    close(fdhandler[1]); // close the write end of the pipe in parent
+                        // this forces the output to flush, otherwise we'd
+                        // have to wait for the pipe to fill up entirely
 
-    //readline(resultStream, result);
+    //readline(resultStream, result); // Only read one line
 
+    // Using a loop to read arbitrary # of lines now
     while (readline(resultStream, result) != EOF) { 
+        // reads one line into the result buffer at a time
+
         printf("blah: %s\n", result);
     }
 
-    close(fdhandler[0]);
+    close(fdhandler[0]); // close the read end of the pipe
 }
 
 // precondiction: *line is a pointer to some buffer with enough space for 
