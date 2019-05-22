@@ -27,14 +27,16 @@ int main(int argc, char **argv) {
 
     // Create communication pipes
     pipe(fdpout);
-    // pipe(fdpin);
+    pipe(fdpin);
 
     FILE *outStream;
 
     int pid = fork();
     if (pid == 0) { // the "process"
-        // dup2(fdpout[1], STDOUT);    // send stdout to the pipe
-        // dup2(fdpout[1], STDERR);    // send stdout to the pipe
+        dup2(fdpout[1], STDOUT);    // send stdout to the pipe write
+        dup2(fdpout[1], STDERR);    // send stdout to the pipe write
+
+        dup2(fdpin[0], STDIN);          // standard in is now pipe read?
 
         // this closes fdpin[0] which is not what we want
         // dup2(STDIN, fdpin[0]);      // send pipe to stdin
@@ -43,16 +45,18 @@ int main(int argc, char **argv) {
 
         // close(fdpin[1]);    // child will not write to the input pipe
         
+        /**
         outStream = popen(argv[1], "w");
         printf("Started process\n");
         dup2(fileno(outStream), STDIN);      
+        **/
 
         //char *argpist[] = {"/usr/bin/python3", "womp.py"};
-        // char *argpist[] = {argv[1], argv[1], (char *) NULL};
-        // execv(argpist[0], argpist);
+        char *argpist[] = {argv[1], argv[1], (char *) NULL};
+        execv(argpist[0], argpist);
 
     }
-    else if (0) { // the main scripter process
+    else { // the main scripter process
 
         char buffer[BUF_SIZE]; // meh?
         char result[BUF_SIZE];
@@ -71,25 +75,33 @@ int main(int argc, char **argv) {
             handle(buffer, result, argHandler, pid);
 
             fprintf(stdout, "RESULT: %s\n", result);
-            fprintf(outputstream, "%s\n", result); // response from handler
+            dprintf(fdpin[1], "%s\n", result);
+            //fprintf(outputstream, "%s\n", result); // response from handler
             printf("Message sent. (1)\n");
             //fflush(outputstream);
 
-            printf("Message sent. (2)\n");
 
         }
         printf("Process terminated, good bye\n");
 
         fclose(inputstream);
     }
-
+/*
+    if (fdpin[0]) {
+        //FILE *outS = fdopen(fdpin[1], "a");
+        dprintf(fdpin[1], "Hello there!\n");
+    }
+*/
+    /**
     if (outStream) {
         printf("well %p\n", outStream);
         fprintf(outStream, "Hello world!\n");
         //fflush(outputstream);
 
     }
-        //close(fdpin[0]);
+    **/
+
+    //close(fdpin[0]);
     //close(fdpin[1]);
 }
 
