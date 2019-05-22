@@ -54,13 +54,13 @@ int main(int argc, char **argv) {
             int val = execv(arr[0], arr);
             printf("%d\n", val); */
 
-            char *argHandler[] = {argv[2], argv[2]}; // I am lazy TODO
 
             // but placed here they do not work
             char *arr[] = {"/bin/echo", "from dawn till dust"};
             int val = execv(arr[0], arr);
             printf("%d\n", val);
 
+            char *argHandler[] = {argv[2], argv[2]}; // I am lazy TODO
 
             handle(buffer, result, argHandler, pid);
             printf("RESULT: %s\n", result);
