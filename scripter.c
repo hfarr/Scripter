@@ -27,24 +27,29 @@ int main(int argc, char **argv) {
 
     // Create communication pipes
     pipe(fdpout);
-    pipe(fdpin);
+    // pipe(fdpin);
+
+    FILE *outStream;
 
     int pid = fork();
     if (pid == 0) { // the "process"
-        dup2(fdpout[1], STDOUT);    // send stdout to the pipe
-        dup2(fdpout[1], STDERR);    // send stdout to the pipe
-        dup2(STDIN, fdpin[0]);      // send pipe to stdin
+        // dup2(fdpout[1], STDOUT);    // send stdout to the pipe
+        // dup2(fdpout[1], STDERR);    // send stdout to the pipe
 
-        close(fdpout[0]);   // we will not read from the output
+        // this closes fdpin[0] which is not what we want
+        // dup2(STDIN, fdpin[0]);      // send pipe to stdin
 
-        // close(fdpin[1]);    // we will not write to the input pipe
+        close(fdpout[0]);   // child will not read from the output
+
+        // close(fdpin[1]);    // child will not write to the input pipe
         
-
+        outStream = popen(argv[1], "w");
         printf("Started process\n");
+        dup2(fileno(outStream), STDIN);      
 
         //char *argpist[] = {"/usr/bin/python3", "womp.py"};
-        char *argpist[] = {argv[1], argv[1], (char *) NULL};
-        execv(argpist[0], argpist);
+        // char *argpist[] = {argv[1], argv[1], (char *) NULL};
+        // execv(argpist[0], argpist);
 
     }
     else if (0) { // the main scripter process
@@ -77,6 +82,15 @@ int main(int argc, char **argv) {
 
         fclose(inputstream);
     }
+
+    if (outStream) {
+        printf("well %p\n", outStream);
+        fprintf(outStream, "Hello world!\n");
+        //fflush(outputstream);
+
+    }
+        //close(fdpin[0]);
+    //close(fdpin[1]);
 }
 
 // Spawn the handling process
