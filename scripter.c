@@ -35,74 +35,40 @@ int main(int argc, char **argv) {
     if (pid == 0) { // the "process"
         dup2(fdpout[1], STDOUT);    // send stdout to the pipe write
         dup2(fdpout[1], STDERR);    // send stdout to the pipe write
-
-        dup2(fdpin[0], STDIN);          // standard in is now pipe read?
-
-        // this closes fdpin[0] which is not what we want
-        // dup2(STDIN, fdpin[0]);      // send pipe to stdin
+        dup2(fdpin[0], STDIN);      // pipe read end now means child stdin
 
         close(fdpout[0]);   // child will not read from the output
-
-        // close(fdpin[1]);    // child will not write to the input pipe
+        close(fdpin[1]);    // child will not write to the input pipe
         
-        /**
-        outStream = popen(argv[1], "w");
-        printf("Started process\n");
-        dup2(fileno(outStream), STDIN);      
-        **/
-
-        //char *argpist[] = {"/usr/bin/python3", "womp.py"};
+        // Execute the 'process' specified in argv[1]
         char *argpist[] = {argv[1], argv[1], (char *) NULL};
         execv(argpist[0], argpist);
 
     }
     else { // the main scripter process
 
-        char buffer[BUF_SIZE]; // meh?
-        char result[BUF_SIZE];
+        char buffer[BUF_SIZE]; // Text from the process
+        char result[BUF_SIZE]; // Response from the handler
         FILE *inputstream = fdopen(fdpout[0], "r");
-        FILE *outputstream = fdopen(fdpin[1], "a");
 
-        close(fdpout[1]);   // we won't write to the output pipe
-        close(fdpin[0]);    // we won't read from the input pipe
+        close(fdpout[1]);   // parent won't write to the output pipe
+        close(fdpin[0]);    // parent won't read from the input pipe
         
         while (readline(inputstream, buffer) != EOF) { 
+            printf("%s\n", buffer);     // Echo the output of the process
 
-            printf("Read a line\n");
-
-            char *argHandler[] = {argv[2], argv[2], (char *) NULL}; 
-
+            // Construct the process start arguments
+            char *argHandler[] = {argv[2], argv[2], buffer, (char *) NULL}; 
             handle(buffer, result, argHandler, pid);
 
             fprintf(stdout, "RESULT: %s\n", result);
             dprintf(fdpin[1], "%s\n", result);
-            //fprintf(outputstream, "%s\n", result); // response from handler
-            printf("Message sent. (1)\n");
-            //fflush(outputstream);
-
 
         }
         printf("Process terminated, good bye\n");
 
         fclose(inputstream);
     }
-/*
-    if (fdpin[0]) {
-        //FILE *outS = fdopen(fdpin[1], "a");
-        dprintf(fdpin[1], "Hello there!\n");
-    }
-*/
-    /**
-    if (outStream) {
-        printf("well %p\n", outStream);
-        fprintf(outStream, "Hello world!\n");
-        //fflush(outputstream);
-
-    }
-    **/
-
-    //close(fdpin[0]);
-    //close(fdpin[1]);
 }
 
 // Spawn the handling process
@@ -112,7 +78,6 @@ void handle(char *input, char *result, char *args[], int pid) {
     pipe(fdhandler); // pipe for child process output
        
     if (fork() == 0) { // Child process execution
-        printf("FROM PROCESS: %s\n", input);
         dup2(fdhandler[1], STDOUT); // pipe stdout to the write-in of the pipe
         
         close(fdhandler[0]); // we don't need to write to the pipe in the child

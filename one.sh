@@ -1,2 +1,2 @@
 #!/bin/bash
-python3 womp.py
+python3 process.py
