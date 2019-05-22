@@ -1,5 +1,7 @@
 import sys
 
+#exit(0)
+
 if (len(sys.argv) > 1):
 
     str_in = sys.argv[1]

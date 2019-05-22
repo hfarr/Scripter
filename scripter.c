@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 
 #define STDIN 0
 #define STDOUT 1
@@ -61,8 +62,9 @@ int main(int argc, char **argv) {
             char *argHandler[] = {argv[2], argv[2], buffer, (char *) NULL}; 
             handle(buffer, result, argHandler, pid);
 
-            // fprintf(stdout, "RESULT: %s\n", result);
-            dprintf(fdpin[1], "%s\n", result);
+            if (strnlen(result, BUF_SIZE) > 0) {
+                dprintf(fdpin[1], "%s\n", result);
+            }
 
         }
         printf("\n----------------------------\
