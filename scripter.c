@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
             int val = execv(arr[0], arr);
             printf("%d\n", val); */
 
-            //char *argHandler[] = {argv[2], argv[2]}; // I am lazy TODO
+            char *argHandler[] = {argv[2], argv[2]}; // I am lazy TODO
 
             // but placed here they do not work
             char *arr[] = {"/bin/echo", "from dawn till dust"};
@@ -62,8 +62,7 @@ int main(int argc, char **argv) {
             printf("%d\n", val);
 
 
-            
-            handle(buffer, result, arr, pid);
+            handle(buffer, result, argHandler, pid);
             printf("RESULT: %s\n", result);
             fprintf(outputstream, "%s\n", result);
         }
