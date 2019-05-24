@@ -1,3 +1,27 @@
+/**
+ *
+ * scripter.c
+ *
+ * This program launches another program (called the process) and
+ * monitors its output (from standard out). Each line of output triggers 
+ * a script which takes that line of output as one of its arguments.
+ * That script (called the handler) processes the output, doing 
+ * any number of things. The handler can optionally print its own output
+ * which is then sent back to the process.
+ *
+ * Usage:
+ * ./scripter <arguments to launch process> <arguments to launch handler>
+ *
+ * It is recommended to use quotation marks, particularly if either
+ * the "process" or "handler" have arguments (the handler almost certainly
+ * will, as that is how information is fed into it currently).
+ *
+ * An additional recommendation is to use shell scripts that will in turn
+ * call other processes, so the shell scripts can be modified with impunity
+ * leaving launch arguments for scripter simplified (just call it with
+ * two scripts).
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -7,12 +31,11 @@
 #define STDOUT 1
 #define STDERR 2
 
+// make this an environment variable?
 #define BUF_SIZE 2048
 
-//int startProcess(char *args, int myIn, int myOut);
-//
+// Method primitives... is that what these are called? fail vocab check
 int readline(FILE *stream, char* line);
-
 void handle(char* input, char *result, char *args[], int pid);
 
 int main(int argc, char **argv) {
@@ -23,10 +46,12 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
+    // gee should I TODO make this a struct
+    // Holds file descriptors for the communication pipes
     int fdpout[2];    // Communications to <process>
     int fdpin[2];
 
-    // Create communication pipes
+    // Create pipes that communicate to/from the process
     pipe(fdpout);
     pipe(fdpin);
 
@@ -34,6 +59,11 @@ int main(int argc, char **argv) {
 
     int pid = fork();
     if (pid == 0) { // the "process"
+
+        printf("\n-------------------\
+                \nProcess starting...\
+                \n-------------------\n");
+
         dup2(fdpout[1], STDOUT);    // send stdout to the pipe write
         dup2(fdpout[1], STDERR);    // send stdout to the pipe write
         dup2(fdpin[0], STDIN);      // pipe read end now means child stdin
@@ -60,11 +90,7 @@ int main(int argc, char **argv) {
 
             // Construct the process start arguments
             char *argHandler[] = {argv[2], argv[2], buffer, (char *) NULL}; 
-            handle(buffer, result, argHandler, pid);
-
-            if (strnlen(result, BUF_SIZE) > 0) {
-                dprintf(fdpin[1], "%s\n", result);
-            }
+            handle(buffer, fdpin[1], argHandler, pid);
 
         }
         printf("\n----------------------------\
@@ -76,29 +102,56 @@ int main(int argc, char **argv) {
 }
 
 // Spawn the handling process
-void handle(char *input, char *result, char *args[], int pid) {
+void handle(char *input, int outputFileDescriptor, char *args[], int pid) {
 
     int fdhandler[2];
     pipe(fdhandler); // pipe for child process output
        
     if (fork() == 0) { // Child process execution
-        dup2(fdhandler[1], STDOUT); // pipe stdout to the write-in of the pipe
-        
-        close(fdhandler[0]); // we don't need to write to the pipe in the child
 
+        // The practical effect of this statement is to send all output
+        // from the handler process through the pipe
+        dup2(fdhandler[1], STDOUT); 
+        
+        // The handler doesn't need to read from the pipe, so we close
+        // it to avoid unexpected blocking
+        close(fdhandler[0]);
+
+        // launch the handler 
         execv(args[0], args);
+
+        // This statement only executes if something goes wrong (the child
+        // closes on failure). Since we don't want to leak out we just 
+        // terminate the child process.
         exit(0);
     }
 
+    // Result stream takes input from the handler process
     FILE *resultStream = fdopen(fdhandler[0], "r");
-    close(fdhandler[1]); // close the write end of the pipe in parent
-                         // this forces the output to flush, otherwise we'd
-                         // have to wait for the pipe to fill up entirely
 
-    readline(resultStream, result); // Only read one line
+    // We do not write to the child process, so we close that end of the pipe
+    // This also forces output from the handler to flush to us immediately
+    // (if we kept the write end open, once the handler closes its side the 
+    //  pipe assumes it will still get input)
+    close(fdhandler[1]);
+
+    // Buffer to hold each line of output from the handler
+    char line[BUF_SIZE];
+
+    // Read all of the output from the handler for given input
+    while (readline(resultStream, line) != EOF) { 
+
+        if (strnlen(line, BUF_SIZE) > 0) {
+           
+            // Send the output from the handler back to the process
+            dprintf(outputFileDescriptor, "%s\n", result);
+        }
+    }
 
     close(fdhandler[0]); // close the read end of the pipe
 }
+
+// TODO should readline return the number of characters read?
 
 // precondiction: *line is a pointer to some buffer with enough space for 
 // the next line
@@ -109,6 +162,7 @@ void handle(char *input, char *result, char *args[], int pid) {
 //
 // returns the last character read, either newline or EOF
 int readline(FILE *stream, char *line) {
+    // when you get an EOF it should still put stuff into the line, right?
     
     int count = 0;
     int character;
