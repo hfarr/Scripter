@@ -36,7 +36,7 @@
 
 // Method primitives... is that what these are called? fail vocab check
 int readline(FILE *stream, char* line);
-void handle(char* input, char *result, char *args[], int pid);
+void handle(char* input, int fileDescripter, char *args[], int pid);
 
 int main(int argc, char **argv) {
 
@@ -144,7 +144,7 @@ void handle(char *input, int outputFileDescriptor, char *args[], int pid) {
         if (strnlen(line, BUF_SIZE) > 0) {
            
             // Send the output from the handler back to the process
-            dprintf(outputFileDescriptor, "%s\n", result);
+            dprintf(outputFileDescriptor, "%s\n", line);
         }
     }
 
