@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
     FILE *outStream;
 
     int pid = fork();
-    if (pid == 0) { // the "process"
+    if (pid == 0) { // the child, which becomes the "process" scripted for
         dup2(fdpout[1], STDOUT);    // send stdout to the pipe write
         dup2(fdpout[1], STDERR);    // send stdout to the pipe write
         dup2(fdpin[0], STDIN);      // pipe read end now means child stdin
@@ -60,8 +60,11 @@ int main(int argc, char **argv) {
 
             // Construct the process start arguments
             char *argHandler[] = {argv[2], argv[2], buffer, (char *) NULL}; 
+
+            // Launch the handler to handle the output
             handle(buffer, result, argHandler, pid);
 
+            // Print the result of the handler back to the main process
             if (strnlen(result, BUF_SIZE) > 0) {
                 dprintf(fdpin[1], "%s\n", result);
             }
@@ -75,19 +78,33 @@ int main(int argc, char **argv) {
     }
 }
 
-// Spawn the handling process
+/**
+ * Launches the handling process
+ *
+ * Args
+ *  input-  The line of input that caused this invocation (unused)
+ *  result- Output of the handler process
+ *  args-   Launch arguments for the handler
+ *  pid-    Process ID for the caller of this function (unused)
+ */
 void handle(char *input, char *result, char *args[], int pid) {
 
     int fdhandler[2];
     pipe(fdhandler); // pipe for child process output
+
+    printf("Sending to handler: %s\n", args[2]);
        
     if (fork() == 0) { // Child process execution
-        dup2(fdhandler[1], STDOUT); // pipe stdout to the write-in of the pipe
-        
-        close(fdhandler[0]); // we don't need to write to the pipe in the child
 
-        execv(args[0], args);
-        exit(0);
+                                // direct the handler's stdout to the 
+                                // write-in of the pipe
+        dup2(fdhandler[1], STDOUT); 
+        
+        close(fdhandler[0]);    // we don't need to read from the handler
+                                // parent will do that
+
+        execv(args[0], args);   // Launch the handler
+        exit(0);                // Close this child process, no longer needed
     }
 
     FILE *resultStream = fdopen(fdhandler[0], "r");
