@@ -76,22 +76,22 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
+    // Set up the file descriptors for all communication
     pipeSetup();
 
+    // Launch the main child process
     int process_pid = forkchild(parent_write, parent_read, argv[1]);
     printf("Process PID: %d\n", process_pid);
 
+    // Launch the handler script process
     int handler_pid = forkchild(process_write, hp_read, argv[2]);
     printf("Child PID: %d\n", handler_pid);
 
-    dprintf(process_write, "Whatup\n");
-
-    // the main scripter process
-    //dup2(process_read, STDIN);
-
+    // Launch the command line reading thread
     pthread_t *thread = malloc(sizeof(pthread_t));
     pthread_create(thread, NULL, &readInput, NULL);
 
+    // Echo output from the process to the command line
     char buffer[BUF_SIZE];
     process_in = fdopen(process_read, "r");
     while (readline(process_in, buffer) != EOF) {
