@@ -36,7 +36,18 @@
 
 // Method primitives... is that what these are called? fail vocab check
 int readline(FILE *stream, char* line);
-void handle(char* input, int fileDescripter, char *args[], int pid);
+void handle(char* input, char* result, char *args[], int pid);
+
+// Read/write to the process child
+int process_write = -1;
+int process_read = -1;
+
+// Read/write back to parent, as process child
+int parent_write = -1;
+int parent_read = -1;
+
+int handler_write = -1;
+int handler_read = -1;
 
 int main(int argc, char **argv) {
 
@@ -48,14 +59,19 @@ int main(int argc, char **argv) {
 
     // gee should I TODO make this a struct
     // Holds file descriptors for the communication pipes
-    int fdpout[2];    // Communications to <process>
+    int fdpout[2];    // Communications to <process> (FileDescriptorProcessOUT)
     int fdpin[2];
 
     // Create pipes that communicate to/from the process
     pipe(fdpout);
     pipe(fdpin);
 
-    FILE *outStream;
+    // Rename pipe variables because confusing
+    process_write = fdpin[1];   // File descriptor for everytime parent writes to child
+    process_read = fdpout[0];   // File descriptor for everytime parent reads from child
+
+    parent_write = fdpout[1];   // File descriptor for writing back to parent
+    parent_read = fdpin[0];     // File descriptor for reading from the parent
 
     int pid = fork();
     if (pid == 0) { // the child, which becomes the "process" scripted for
@@ -63,12 +79,12 @@ int main(int argc, char **argv) {
                 \nProcess starting...\
                 \n-------------------\n");
 
-        dup2(fdpout[1], STDOUT);    // send stdout to the pipe write
-        dup2(fdpout[1], STDERR);    // send stdout to the pipe write
-        dup2(fdpin[0], STDIN);      // pipe read end now means child stdin
+        dup2(parent_write, STDOUT);    // send stdout to the parent
+        dup2(parent_write, STDERR);    // send stdout to the parent
+        dup2(parent_read, STDIN);      // read everything from parent as if it came from stdin
 
-        close(fdpout[0]);   // child will not read from the output
-        close(fdpin[1]);    // child will not write to the input pipe
+        close(process_read);    // child will not read/write to itself
+        close(process_write);
         
         // Execute the 'process' specified in argv[1]
         char *argpist[] = {argv[1], argv[1], (char *) NULL};
@@ -79,10 +95,10 @@ int main(int argc, char **argv) {
 
         char buffer[BUF_SIZE]; // Text from the process
         char result[BUF_SIZE]; // Response from the handler
-        FILE *inputstream = fdopen(fdpout[0], "r");
+        FILE *inputstream = fdopen(process_read, "r");  // Get a file pointer from child output
 
-        close(fdpout[1]);   // parent won't write to the output pipe
-        close(fdpin[0]);    // parent won't read from the input pipe
+        close(parent_write);   //parent won't read/write to itself
+        close(parent_read);
         
         while (readline(inputstream, buffer) != EOF) { 
             printf("%s\n", buffer);     // Echo the output of the process
@@ -95,7 +111,7 @@ int main(int argc, char **argv) {
 
             // Print the result of the handler back to the main process
             if (strnlen(result, BUF_SIZE) > 0) {
-                dprintf(fdpin[1], "%s\n", result);
+                dprintf(process_write, "%s\n", result);
             }
 
         }
@@ -149,14 +165,16 @@ void handle(char *input, char *result, char *args[], int pid) {
     char line[BUF_SIZE];
 
     // Read all of the output from the handler for given input
+    readline(resultStream, line);
+    /*
     while (readline(resultStream, line) != EOF) { 
 
         if (strnlen(line, BUF_SIZE) > 0) {
            
             // Send the output from the handler back to the process
-            dprintf(outputFileDescriptor, "%s\n", line);
+            dprintf(process_write, "%s\n", line);
         }
-    }
+    }*/
 
     close(fdhandler[0]); // close the read end of the pipe
 }

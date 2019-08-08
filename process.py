@@ -1,23 +1,10 @@
-f = open("output.txt", 'w')
+with open("output.txt", 'w') as f:
 
+    value = ""
+    while (value != 'stop'):
 
-def outToFile(text, f):
-    f.write(text + "\n")
+        value = input()
 
-print("Simulated output fredo")
-outToFile(input(), f)
-
-print("this is the end")
-outToFile(input(), f)
-
-print("[22:19:55] [Server thread/INFO]: fredo joined the game")
-outToFile(input(), f)
-
-print("who")
-outToFile(input(), f)
-
-print("what")
-outToFile(input(), f)
-
-f.close()
-
+        f.write(value + '\n')
+        print("Line written: {}".format(value))
+        
