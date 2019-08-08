@@ -22,11 +22,21 @@
  * two scripts).
  */
 
+/*
+ * !!!!!!!!!!IMPORTANT!!!!!!!!!!!
+ * !                            !
+ * ! Must compile with -pthread !
+ * !          flag              !
+ * !                            !
+ * !!!!!!!!!!IMPORTANT!!!!!!!!!!!
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <pthread.h>
 
 #define STDIN 0
 #define STDOUT 1
@@ -40,6 +50,7 @@ int forkchild(int fileDescriptorOut, int fileDescriptorIn, char* path);
 int readline(FILE *stream, char* line);
 void handle(char* input, char* result, char *args[], int pid);
 void pipeSetup();
+void *readInput(void *ignored);
 
 // Read/write to the process child
 int process_write = -1;
@@ -54,6 +65,8 @@ int handler_write = -1;
 
 // Read from the parent as handler
 int hp_read = -1;
+
+FILE* process_in;
 
 int main(int argc, char **argv) {
 
@@ -74,14 +87,36 @@ int main(int argc, char **argv) {
     dprintf(process_write, "Whatup\n");
 
     // the main scripter process
-    dup2(process_read, STDIN);
+    //dup2(process_read, STDIN);
+
+    pthread_t *thread = malloc(sizeof(pthread_t));
+    pthread_create(thread, NULL, &readInput, NULL);
 
     char buffer[BUF_SIZE];
-    while (readline(stdin, buffer) != EOF) {
+    process_in = fdopen(process_read, "r");
+    while (readline(process_in, buffer) != EOF) {
         printf("%s\n", buffer);
         dprintf(handler_write, "%s\n", buffer);
     }
 
+}
+
+void stop() {
+    // TODO use signal handling instead of EOF?
+    printf("Stopping scripter!\n");
+    //dprintf(handler_write, "%c", '\0');
+    //dprintf(process_write, "%c", '\0');
+    
+    exit(0);
+}
+
+void *readInput(void *ignored) {
+
+    char buffer[BUF_SIZE];
+    while (readline(stdin, buffer) != EOF) {
+        dprintf(process_write, "%s\n", buffer);
+    }
+    stop();
 }
 
 void pipeSetup() {

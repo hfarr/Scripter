@@ -8,6 +8,9 @@ with open("handlerout.txt", 'w') as f:
 
     while(True):
         result = input()
+        if (result == '\0'):
+            break
 
         f.write(result + "\n");
+        f.flush()
 
