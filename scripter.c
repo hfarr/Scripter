@@ -36,8 +36,10 @@
 #define BUF_SIZE 2048
 
 // Method primitives... is that what these are called? fail vocab check
+int forkchild(int fileDescriptorOut, int fileDescriptorIn, char* path);
 int readline(FILE *stream, char* line);
 void handle(char* input, char* result, char *args[], int pid);
+void pipeSetup();
 
 // Read/write to the process child
 int process_write = -1;
@@ -61,11 +63,32 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    // gee should I TODO make this a struct
+    pipeSetup();
+
+    int process_pid = forkchild(parent_write, parent_read, argv[1]);
+    printf("Process PID: %d\n", process_pid);
+
+    int handler_pid = forkchild(process_write, hp_read, argv[2]);
+    printf("Child PID: %d\n", handler_pid);
+
+    dprintf(process_write, "Whatup\n");
+
+    // the main scripter process
+    dup2(process_read, STDIN);
+
+    char buffer[BUF_SIZE];
+    while (readline(stdin, buffer) != EOF) {
+        printf("%s\n", buffer);
+        dprintf(handler_write, "%s\n", buffer);
+    }
+
+}
+
+void pipeSetup() {
+
     // Holds file descriptors for the communication pipes
     int fdpout[2];  // Communication from <process> (FileDescriptorProcessOUT)
     int fdpin[2];   // Communication to <process>
-
     int fdhin[2];   // Communication to handler
 
     // Create pipes that communicate to/from the process
@@ -83,54 +106,23 @@ int main(int argc, char **argv) {
     hp_read         = fdhin[0]; // File descriptor for reading from parent
     handler_write   = fdhin[1]; // File descriptor for writing to handler
 
-    int process_pid = fork();
-    if (process_pid == 0) { // the child, which becomes the "process" scripted for
-        printf("\n-------------------\
-                \nProcess starting...\
-                \n-------------------\n");
+}
 
-        dup2(parent_write, STDOUT);    // send stdout to the parent
-        dup2(parent_write, STDERR);    // send stdout to the parent
-        dup2(parent_read, STDIN);      // read everything from parent as if it came from stdin
+int forkchild(int fileDescriptorOut, int fileDescriptorIn, char *path) {
 
-        close(process_read);    // child will not read/write to itself
-        close(process_write);
-        
-        // Execute the 'process' specified in argv[1]
-        char *argpist[] = {argv[1], argv[1], (char *) NULL};
-        execv(argpist[0], argpist);
-        perror("Process errored unexpectedly\n");
+    char *argv[] = {path, path, (char *) NULL};  // TODO hacky solution, remove
+
+    int pid = fork();
+    if (pid == 0) {
+
+        dup2(fileDescriptorIn, STDIN);      // Input to this child
+        dup2(fileDescriptorOut, STDOUT);    // Output from this child
+        execv(path, argv); // Does not return under normal conditions
+        perror("Child process ended unexpectedly\n");
         exit(-1);
     }
-    printf("Process PID: %d\n", process_pid);
 
-    int handler_pid = fork();
-    if (handler_pid == 0) {
-        printf("\n-------------------\
-                \nHandler starting...\
-                \n-------------------\n");
-
-        dup2(process_write, STDOUT);    // Output from handler goes to process
-        dup2(hp_read, STDIN);      // Input to handler comes from parent
-
-        char *arglist[] = {argv[2], argv[2], (char *) NULL};
-        execv(arglist[0], arglist);
-        perror("Handler errored unexpectedly\n");
-        exit(-1);
-    }
-    printf("Child PID: %d\n", handler_pid);
-
-    dprintf(process_write, "Whatup\n");
-
-    // the main scripter process
-    dup2(process_read, STDIN);
-
-    char buffer[BUF_SIZE];
-    while (readline(stdin, buffer) != EOF) {
-        printf("%s\n", buffer);
-        dprintf(handler_write, "%s\n", buffer);
-    }
-
+    return pid; // Parent, child should never get here
 }
 
 // TODO should readline return the number of characters read?
