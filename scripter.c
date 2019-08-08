@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
 
 #define STDIN 0
 #define STDOUT 1
@@ -46,8 +47,11 @@ int process_read = -1;
 int parent_write = -1;
 int parent_read = -1;
 
+// Write to the handler from parent
 int handler_write = -1;
-int handler_read = -1;
+
+// Read from the parent as handler
+int hp_read = -1;
 
 int main(int argc, char **argv) {
 
@@ -59,22 +63,28 @@ int main(int argc, char **argv) {
 
     // gee should I TODO make this a struct
     // Holds file descriptors for the communication pipes
-    int fdpout[2];    // Communications to <process> (FileDescriptorProcessOUT)
-    int fdpin[2];
+    int fdpout[2];  // Communication from <process> (FileDescriptorProcessOUT)
+    int fdpin[2];   // Communication to <process>
+
+    int fdhin[2];   // Communication to handler
 
     // Create pipes that communicate to/from the process
     pipe(fdpout);
     pipe(fdpin);
+    pipe(fdhin);
 
     // Rename pipe variables because confusing
-    process_write = fdpin[1];   // File descriptor for everytime parent writes to child
-    process_read = fdpout[0];   // File descriptor for everytime parent reads from child
+    parent_read     = fdpin[0]; // File descriptor for reading from the parent
+    process_write   = fdpin[1]; // File descriptor for everytime parent writes to child
 
-    parent_write = fdpout[1];   // File descriptor for writing back to parent
-    parent_read = fdpin[0];     // File descriptor for reading from the parent
+    process_read    = fdpout[0];    // File descriptor for everytime parent reads from child
+    parent_write    = fdpout[1];    // File descriptor for writing back to parent
 
-    int pid = fork();
-    if (pid == 0) { // the child, which becomes the "process" scripted for
+    hp_read         = fdhin[0]; // File descriptor for reading from parent
+    handler_write   = fdhin[1]; // File descriptor for writing to handler
+
+    int process_pid = fork();
+    if (process_pid == 0) { // the child, which becomes the "process" scripted for
         printf("\n-------------------\
                 \nProcess starting...\
                 \n-------------------\n");
@@ -89,94 +99,38 @@ int main(int argc, char **argv) {
         // Execute the 'process' specified in argv[1]
         char *argpist[] = {argv[1], argv[1], (char *) NULL};
         execv(argpist[0], argpist);
-
+        perror("Process errored unexpectedly\n");
+        exit(-1);
     }
-    else { // the main scripter process
+    printf("Process PID: %d\n", process_pid);
 
-        char buffer[BUF_SIZE]; // Text from the process
-        char result[BUF_SIZE]; // Response from the handler
-        FILE *inputstream = fdopen(process_read, "r");  // Get a file pointer from child output
+    int handler_pid = fork();
+    if (handler_pid == 0) {
+        printf("\n-------------------\
+                \nHandler starting...\
+                \n-------------------\n");
 
-        close(parent_write);   //parent won't read/write to itself
-        close(parent_read);
-        
-        while (readline(inputstream, buffer) != EOF) { 
-            printf("%s\n", buffer);     // Echo the output of the process
+        dup2(process_write, STDOUT);    // Output from handler goes to process
+        dup2(hp_read, STDIN);      // Input to handler comes from parent
 
-            // Construct the process start arguments
-            char *argHandler[] = {argv[2], argv[2], buffer, (char *) NULL}; 
-
-            // Launch the handler to handle the output
-            handle(buffer, result, argHandler, pid);
-
-            // Print the result of the handler back to the main process
-            if (strnlen(result, BUF_SIZE) > 0) {
-                dprintf(process_write, "%s\n", result);
-            }
-
-        }
-        printf("\n----------------------------\
-                \nProcess terminated, good bye\
-                \n----------------------------\n");
-
-        fclose(inputstream);
+        char *arglist[] = {argv[2], argv[2], (char *) NULL};
+        execv(arglist[0], arglist);
+        perror("Handler errored unexpectedly\n");
+        exit(-1);
     }
-}
+    printf("Child PID: %d\n", handler_pid);
 
-/**
- * Launches the handling process
- *
- * Args
- *  input-  The line of input that caused this invocation (unused)
- *  result- Output of the handler process
- *  args-   Launch arguments for the handler
- *  pid-    Process ID for the caller of this function (unused)
- */
-void handle(char *input, char *result, char *args[], int pid) {
+    dprintf(process_write, "Whatup\n");
 
-    int fdhandler[2];
-    pipe(fdhandler); // pipe for child process output
+    // the main scripter process
+    dup2(process_read, STDIN);
 
-    printf("Sending to handler: %s\n", args[2]);
-       
-    if (fork() == 0) { // Child process execution
-
-                                // direct the handler's stdout to the 
-                                // write-in of the pipe
-        dup2(fdhandler[1], STDOUT); 
-        
-        close(fdhandler[0]);    // we don't need to read from the handler
-                                // parent will do that
-
-        execv(args[0], args);   // Launch the handler
-        exit(0);                // Close this child process, no longer needed
+    char buffer[BUF_SIZE];
+    while (readline(stdin, buffer) != EOF) {
+        printf("%s\n", buffer);
+        dprintf(handler_write, "%s\n", buffer);
     }
 
-    // Result stream takes input from the handler process
-    FILE *resultStream = fdopen(fdhandler[0], "r");
-
-    // We do not write to the child process, so we close that end of the pipe
-    // This also forces output from the handler to flush to us immediately
-    // (if we kept the write end open, once the handler closes its side the 
-    //  pipe assumes it will still get input)
-    close(fdhandler[1]);
-
-    // Buffer to hold each line of output from the handler
-    char line[BUF_SIZE];
-
-    // Read all of the output from the handler for given input
-    readline(resultStream, line);
-    /*
-    while (readline(resultStream, line) != EOF) { 
-
-        if (strnlen(line, BUF_SIZE) > 0) {
-           
-            // Send the output from the handler back to the process
-            dprintf(process_write, "%s\n", line);
-        }
-    }*/
-
-    close(fdhandler[0]); // close the read end of the pipe
 }
 
 // TODO should readline return the number of characters read?

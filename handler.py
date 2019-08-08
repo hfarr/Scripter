@@ -1,14 +1,13 @@
 import sys
 
-#exit(0)
 
-if (len(sys.argv) > 1):
+with open("handlerout.txt", 'w') as f:
 
-    str_in = sys.argv[1]
-    if "fredo" in str_in:
-        print("fredo was mentioned")
-    else:
-        print("fredo was not mentioned") 
+   
+    print("This should be written to the process output file")
 
-#stringIn = input("")
-#print("This is the response from the handler")
+    while(True):
+        result = input()
+
+        f.write(result + "\n");
+
