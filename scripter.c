@@ -2,24 +2,25 @@
  *
  * scripter.c
  *
- * This program launches another program (called the process) and
- * monitors its output (from standard out). Each line of output triggers 
- * a script which takes that line of output as one of its arguments.
- * That script (called the handler) processes the output, doing 
- * any number of things. The handler can optionally print its own output
- * which is then sent back to the process.
+ * This program launches another program (called the process) and acts
+ * as a wrapper for it. Input and output from Scripter are mirrored to
+ * and from the process. Each line of output from the process are sent
+ * to another program that is launched (called the handler).
+ * The handler processes the output, doing anything imaginable with
+ * the output from the process. Anything printed from the handler (as
+ * a response to the process or otherwise) is in turn sent to the
+ * process.
  *
  * Usage:
  * ./scripter <arguments to launch process> <arguments to launch handler>
  *
  * It is recommended to use quotation marks, particularly if either
- * the "process" or "handler" have arguments (the handler almost certainly
- * will, as that is how information is fed into it currently).
+ * the "process" or "handler" have arguments
  *
- * An additional recommendation is to use shell scripts that will in turn
- * call other processes, so the shell scripts can be modified with impunity
- * leaving launch arguments for scripter simplified (just call it with
- * two scripts).
+ * An additional recommendation is to use shell scripts as the handler
+ * and the process, so the run arguments for Scripter don't have to
+ * change from run to run, and desired changes to the run configurations
+ * are saved in the scripts.
  *
  * @author Henry Farr
  * @email hmf4455@rit.edu
@@ -123,6 +124,7 @@ int main(int argc, char **argv) {
  * Stop this program. TODO doesn't handle killing children well
  */
 void stop() {
+
     // TODO use signal handling instead of EOF?
     printf("Stopping scripter!\n");
     
