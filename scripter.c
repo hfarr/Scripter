@@ -94,13 +94,13 @@ int main(int argc, char **argv) {
     // Set up the file descriptors for all communication
     pipeSetup();
 
-    // Launch the main child process
+    // Launch the "process"
     int process_pid = forkchild(parent_write, parent_read, argv[1]);
     printf("Process PID: %d\n", process_pid);
 
-    // Launch the handler script process
+    // Launch the "handler"
     int handler_pid = forkchild(process_write, hp_read, argv[2]);
-    printf("Child PID: %d\n", handler_pid);
+    printf("Handler PID: %d\n", handler_pid);
 
     // Launch the command line reading thread
     pthread_t *thread = malloc(sizeof(pthread_t));
@@ -151,24 +151,35 @@ void *readInput(void *ignored) {
 void pipeSetup() {
 
     // Holds file descriptors for the communication pipes
-    int fdpout[2];  // Communication from <process> (FileDescriptorProcessOUT)
-    int fdpin[2];   // Communication to <process>
+    int fdpout[2];  // Communication from process
+    int fdpin[2];   // Communication to process
     int fdhin[2];   // Communication to handler
+    // No communication FROM handler- that goes to process
 
     // Create pipes that communicate to/from the process
     pipe(fdpout);
     pipe(fdpin);
     pipe(fdhin);
 
-    // Rename pipe variables because confusing
-    parent_read     = fdpin[0]; // File descriptor for reading from the parent
-    process_write   = fdpin[1]; // File descriptor for everytime parent writes to child
+    // Rename pipe end points
+    // PARENT --> PROCESS and HANDLER --> PROCESS
+    parent_read   = fdpin[0]; // File descriptor for reading from parent
+    process_write = fdpin[1]; // File descriptor for writing to process
 
-    process_read    = fdpout[0];    // File descriptor for everytime parent reads from child
-    parent_write    = fdpout[1];    // File descriptor for writing back to parent
+    // PROCESS --> PARENT
+    process_read = fdpout[0]; // File descriptor for reading from process
+    parent_write = fdpout[1]; // File descriptor for writing to parent
 
-    hp_read         = fdhin[0]; // File descriptor for reading from parent
-    handler_write   = fdhin[1]; // File descriptor for writing to handler
+    // PARENT --> HANDLER
+    hp_read       = fdhin[0]; // File descriptor for reading from parent
+    handler_write = fdhin[1]; // File descriptor for writing to handler
+
+    /*
+     * No HANDLER --> PARENT because handler writes to process
+     * using the "to process" pipe, skipping parent
+     * Process writes to parent, which then has the job of echoing that
+     * to the user and to the handler
+     */
 
 }
 
