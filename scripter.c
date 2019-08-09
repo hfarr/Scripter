@@ -20,6 +20,10 @@
  * call other processes, so the shell scripts can be modified with impunity
  * leaving launch arguments for scripter simplified (just call it with
  * two scripts).
+ *
+ * @author Henry Farr
+ * @email hmf4455@rit.edu
+ *
  */
 
 /*
@@ -47,27 +51,37 @@
 
 // Method primitives... is that what these are called? fail vocab check
 int forkchild(int fileDescriptorOut, int fileDescriptorIn, char* path);
-int readline(FILE *stream, char* line);
+int readline(FILE *stream, char* line, int buf_size);
 void handle(char* input, char* result, char *args[], int pid);
 void pipeSetup();
 void *readInput(void *ignored);
 
-// Read/write to the process child
+// File descriptors to read/write to the process child
 int process_write = -1;
 int process_read = -1;
 
-// Read/write back to parent, as process child
+// File descriptors to read/write back to parent, as process child
 int parent_write = -1;
 int parent_read = -1;
 
-// Write to the handler from parent
+// File descriptors to write to the handler from parent
 int handler_write = -1;
 
-// Read from the parent as handler
+// File descriptors to read from the parent as handler
 int hp_read = -1;
 
+// File pointer to the output from the process. This is
+// associated with the process_read file descriptor
 FILE* process_in;
 
+/**
+ * Entry point for Scriptor
+ * Set up the three communication pipes, launch
+ * the subprocesses "process" and "handler".
+ * Finally, mirror the input/output of "process"
+ * by forwarding lines read from stdin to "process"
+ * and forward all of the output from "process" to the "handler
+ **/
 int main(int argc, char **argv) {
 
     if (argc != 3) {
@@ -91,34 +105,47 @@ int main(int argc, char **argv) {
     pthread_t *thread = malloc(sizeof(pthread_t));
     pthread_create(thread, NULL, &readInput, NULL);
 
-    // Echo output from the process to the command line
+    // Read input from the "process"
     char buffer[BUF_SIZE];
     process_in = fdopen(process_read, "r");
-    while (readline(process_in, buffer) != EOF) {
-        printf("%s\n", buffer);
-        dprintf(handler_write, "%s\n", buffer);
+    while (readline(process_in, buffer, BUF_SIZE) != EOF) {
+
+        // Echo output from the process to stdout
+        printf("%s\n", buffer); 
+        
+        // Forward the output to the "handler"
+        dprintf(handler_write, "%s\n", buffer); 
     }
 
 }
 
+/*
+ * Stop this program. TODO doesn't handle killing children well
+ */
 void stop() {
     // TODO use signal handling instead of EOF?
     printf("Stopping scripter!\n");
-    //dprintf(handler_write, "%c", '\0');
-    //dprintf(process_write, "%c", '\0');
     
     exit(0);
 }
 
+/**
+ * Thread to continuously read input from stdin and
+ * print it directly to the "process"
+ */
 void *readInput(void *ignored) {
 
     char buffer[BUF_SIZE];
-    while (readline(stdin, buffer) != EOF) {
+    while (readline(stdin, buffer, BUF_SIZE) != EOF) {
         dprintf(process_write, "%s\n", buffer);
     }
     stop();
 }
 
+/**
+ * Set up the three main communication pipes and alias the six endpoints
+ * Pipes are described within the function
+ */
 void pipeSetup() {
 
     // Holds file descriptors for the communication pipes
@@ -143,9 +170,25 @@ void pipeSetup() {
 
 }
 
+/* TODO should accept actual runtime arguments
+ * Fork a child process that in turn executes another process
+ * with a system call. Input and output to the child process are
+ * redirected via the given file descriptors.
+ *
+ * Arguments:
+ *  fileDescriptorOut:  File descriptor where stdout is redirected
+ *  fileDescriptorIn:   File descriptor where stdin is redirected
+ *  path:   Path to the exectuable to be run
+ *
+ * Return:
+ *  Returns the processID of the child back to the parent. Child
+ *  process never returns.
+ */
 int forkchild(int fileDescriptorOut, int fileDescriptorIn, char *path) {
 
-    char *argv[] = {path, path, (char *) NULL};  // TODO hacky solution, remove
+    // TODO Hacky solution to construct argv- we also don't support
+    // any actual arguments to the child processes
+    char *argv[] = {path, path, (char *) NULL};  
 
     int pid = fork();
     if (pid == 0) {
@@ -162,23 +205,36 @@ int forkchild(int fileDescriptorOut, int fileDescriptorIn, char *path) {
 
 // TODO should readline return the number of characters read?
 
-// precondiction: *line is a pointer to some buffer with enough space for 
-// the next line
-//
-// read a line from stream by:
-// * reading until newline character or EOF, placing characters into line
-// * not including the newline character
-//
-// returns the last character read, either newline or EOF
-int readline(FILE *stream, char *line) {
-    // when you get an EOF it should still put stuff into the line, right?
+/* precondiction: *line is a pointer to some buffer with enough space for 
+ * the next line
+ *
+ * read a line from stream by:
+ * * reading until newline character or EOF, placing characters into line
+ * * not including the newline character
+ * This function is executed for the side effect of modifying
+ * the value pointed to by *line
+ *
+ * Arguments:
+ *      stream: Input stream to read from
+ *      line:   Buffer to write the result
+ *      buffer_size:    Size of the buffer (including space for null term)
+ *
+ * returns the last character read, either newline or EOF
+ */
+int readline(FILE *stream, char *line, int buffer_size) {
     
     int count = 0;
     int character;
 
     do {
+        if (count > buffer_size) {
+            fprintf(stderr, 
+                    "Attempted to read a size larger than the buffer allows");
+            break;
+        }
         character = fgetc(stream);
         line[count++] = character;
+
     } while (character != '\n' && character != EOF);
     line[count-1] = 0;
 
