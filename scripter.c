@@ -91,24 +91,30 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    // Set up the file descriptors for all communication
-    pipeSetup();
+    int mainPID = fork();
 
-    // Theory: just set up the pipes, then terminate scripter :/
-    // if that STILL shuts things down, then I guess we just fork again
-    // and. idk. forever loop. :/ bummer
+    if (mainPID) {
+        printf("SCRIPTER PROCESS ID: %d\n", mainPID);
+    } else {
+        // Set up the file descriptors for all communication
+        pipeSetup();
 
-    // Launch the "process"
-    // int process_pid = forkchild(parent_write, parent_read, argv[1]);
-    int process_pid = forkchild(handler_write, process_read, argv[1]);
-    printf("Process PID: %d\n", process_pid);
+        // Theory: just set up the pipes, then terminate scripter :/
+        // if that STILL shuts things down, then I guess we just fork again
+        // and. idk. forever loop. :/ bummer
 
-    // Launch the "handler"
-    // int handler_pid = forkchild(process_write, handler_read, argv[2]);
-    int handler_pid = forkchild(process_write, handler_read, argv[2]);
-    printf("Handler PID: %d\n", handler_pid);
+        // Launch the "process"
+        // int process_pid = forkchild(parent_write, parent_read, argv[1]);
+        int process_pid = forkchild(handler_write, process_read, argv[1]);
+        printf("Process PID: %d\n", process_pid);
 
-    while (1);
+        // Launch the "handler"
+        // int handler_pid = forkchild(process_write, handler_read, argv[2]);
+        int handler_pid = forkchild(process_write, handler_read, argv[2]);
+        printf("Handler PID: %d\n", handler_pid);
+
+        while (1);
+    }
 
     // Launch the command line reading thread
     // pthread_t *thread = malloc(sizeof(pthread_t));
