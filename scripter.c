@@ -23,7 +23,7 @@
  * are saved in the scripts.
  *
  * @author Henry Farr
- * @email hmf4455@rit.edu
+ * @email hfarr@hey.com
  *
  */
 
@@ -69,14 +69,14 @@ int parent_read = -1;
 int handler_write = -1;
 
 // File descriptors to read from the parent as handler
-int hp_read = -1;
+int handler_read = -1;
 
 // File pointer to the output from the process. This is
 // associated with the process_read file descriptor
 FILE* process_in;
 
 /**
- * Entry point for Scriptor
+ * Entry point for Scripter
  * Set up the three communication pipes, launch
  * the subprocesses "process" and "handler".
  * Finally, mirror the input/output of "process"
@@ -94,12 +94,18 @@ int main(int argc, char **argv) {
     // Set up the file descriptors for all communication
     pipeSetup();
 
+    // Theory: just set up the pipes, then terminate scripter :/
+    // if that STILL shuts things down, then I guess we just fork again
+    // and. idk. forever loop. :/ bummer
+
     // Launch the "process"
     int process_pid = forkchild(parent_write, parent_read, argv[1]);
+    // int process_pid = forkchild(handler_write, handler_read, argv[1]);
     printf("Process PID: %d\n", process_pid);
 
     // Launch the "handler"
-    int handler_pid = forkchild(process_write, hp_read, argv[2]);
+    int handler_pid = forkchild(process_write, handler_read, argv[2]);
+    // int handler_pid = forkchild(process_write, process_read, argv[2]);
     printf("Handler PID: %d\n", handler_pid);
 
     // Launch the command line reading thread
@@ -113,7 +119,7 @@ int main(int argc, char **argv) {
 
         // Echo output from the process to stdout
         printf("%s\n", buffer); 
-        
+     
         // Forward the output to the "handler"
         dprintf(handler_write, "%s\n", buffer); 
     }
@@ -123,13 +129,13 @@ int main(int argc, char **argv) {
 /*
  * Stop this program. TODO doesn't handle killing children well
  */
-void stop() {
-
-    // TODO use signal handling instead of EOF?
-    printf("Stopping scripter!\n");
-    
-    exit(0);
-}
+//void stop() {
+//
+//    // TODO use signal handling instead of EOF?
+//    printf("Stopping scripter!\n");
+//    
+//    exit(0);
+//}
 
 /**
  * Thread to continuously read input from stdin and
@@ -137,11 +143,12 @@ void stop() {
  */
 void *readInput(void *ignored) {
 
+    printf("Starting to read forever\n");
     char buffer[BUF_SIZE];
     while (readline(stdin, buffer, BUF_SIZE) != EOF) {
         dprintf(process_write, "%s\n", buffer);
     }
-    stop();
+    // stop();
 }
 
 /**
@@ -171,7 +178,8 @@ void pipeSetup() {
     parent_write = fdpout[1]; // File descriptor for writing to parent
 
     // PARENT --> HANDLER
-    hp_read       = fdhin[0]; // File descriptor for reading from parent
+    // hp_read       = fdhin[0]; // File descriptor for reading from parent
+    handler_read  = fdhin[0]; // File descriptor for reading from handler
     handler_write = fdhin[1]; // File descriptor for writing to handler
 
     /*
