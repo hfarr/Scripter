@@ -99,30 +99,32 @@ int main(int argc, char **argv) {
     // and. idk. forever loop. :/ bummer
 
     // Launch the "process"
-    int process_pid = forkchild(parent_write, parent_read, argv[1]);
-    // int process_pid = forkchild(handler_write, handler_read, argv[1]);
+    // int process_pid = forkchild(parent_write, parent_read, argv[1]);
+    int process_pid = forkchild(handler_write, process_read, argv[1]);
     printf("Process PID: %d\n", process_pid);
 
     // Launch the "handler"
+    // int handler_pid = forkchild(process_write, handler_read, argv[2]);
     int handler_pid = forkchild(process_write, handler_read, argv[2]);
-    // int handler_pid = forkchild(process_write, process_read, argv[2]);
     printf("Handler PID: %d\n", handler_pid);
 
+    while (1);
+
     // Launch the command line reading thread
-    pthread_t *thread = malloc(sizeof(pthread_t));
-    pthread_create(thread, NULL, &readInput, NULL);
+    // pthread_t *thread = malloc(sizeof(pthread_t));
+    // pthread_create(thread, NULL, &readInput, NULL);
 
     // Read input from the "process"
-    char buffer[BUF_SIZE];
-    process_in = fdopen(process_read, "r");
-    while (readline(process_in, buffer, BUF_SIZE) != EOF) {
+    // char buffer[BUF_SIZE];
+    // process_in = fdopen(process_read, "r");
+    // while (readline(process_in, buffer, BUF_SIZE) != EOF) {
 
-        // Echo output from the process to stdout
-        printf("%s\n", buffer); 
-     
-        // Forward the output to the "handler"
-        dprintf(handler_write, "%s\n", buffer); 
-    }
+    //     // Echo output from the process to stdout
+    //     printf("%s\n", buffer); 
+    //  
+    //     // Forward the output to the "handler"
+    //     dprintf(handler_write, "%s\n", buffer); 
+    // }
 
 }
 
@@ -158,24 +160,25 @@ void *readInput(void *ignored) {
 void pipeSetup() {
 
     // Holds file descriptors for the communication pipes
-    int fdpout[2];  // Communication from process
+    // int fdpout[2];  // Communication from process
     int fdpin[2];   // Communication to process
     int fdhin[2];   // Communication to handler
     // No communication FROM handler- that goes to process
 
     // Create pipes that communicate to/from the process
-    pipe(fdpout);
+    // pipe(fdpout);
     pipe(fdpin);
     pipe(fdhin);
 
     // Rename pipe end points
     // PARENT --> PROCESS and HANDLER --> PROCESS
-    parent_read   = fdpin[0]; // File descriptor for reading from parent
+    // parent_read   = fdpin[0]; // File descriptor for reading from parent
+    process_read  = fdpin[0]; // File descriptor for reading from parent
     process_write = fdpin[1]; // File descriptor for writing to process
 
     // PROCESS --> PARENT
-    process_read = fdpout[0]; // File descriptor for reading from process
-    parent_write = fdpout[1]; // File descriptor for writing to parent
+    // process_read = fdpout[0]; // File descriptor for reading from process
+    // parent_write = fdpout[1]; // File descriptor for writing to parent
 
     // PARENT --> HANDLER
     // hp_read       = fdhin[0]; // File descriptor for reading from parent
@@ -214,8 +217,8 @@ int forkchild(int fileDescriptorOut, int fileDescriptorIn, char *path) {
     int pid = fork();
     if (pid == 0) {
 
-        dup2(fileDescriptorIn, STDIN);      // Input to this child
         dup2(fileDescriptorOut, STDOUT);    // Output from this child
+        dup2(fileDescriptorIn, STDIN);      // Input to this child
         execv(path, argv); // Does not return under normal conditions
         perror("Child process ended unexpectedly\n");
         exit(-1);
